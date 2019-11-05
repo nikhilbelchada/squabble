@@ -88,6 +88,7 @@ defmodule Squabble do
     :ok = :net_kernel.monitor_nodes(true)
 
     size = Keyword.get(opts, :size, 1)
+    weight = Keyword.get(opts, :weight, 1)
     subscriptions = Keyword.get(opts, :subscriptions, [])
 
     state = %State{
@@ -96,6 +97,7 @@ defmodule Squabble do
       subscriptions: subscriptions,
       term: 0,
       highest_seen_term: 0,
+      weight: weight,
       votes: []
     }
 
@@ -107,6 +109,12 @@ defmodule Squabble do
     {:noreply, state}
   end
 
+  def handle_call(:stop, _, state) do
+    {:stop, :stop, state}
+  end
+
+  def stop, do: GenServer.call(__MODULE__, :stop)
+
   def handle_call(:state, _from, state) do
     {:reply, Map.put(state, :node, node()), state}
   end
@@ -114,6 +122,10 @@ defmodule Squabble do
   def handle_call(:debug, _from, state) do
     debug = Server.debug(state)
     {:reply, debug, state}
+  end
+
+  def handle_call(:weight, _from, state) do
+    {:reply, state.weight, state}
   end
 
   def handle_cast({:leader, :check, pid}, state) do

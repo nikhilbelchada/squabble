@@ -87,17 +87,26 @@ defmodule Squabble.Server do
         if state.size == 1 do
           voted_leader(state, 1)
         else
-          PG.broadcast(fn pid ->
-            Squabble.announce_candidate(pid, term)
-          end)
-
-          Process.send_after(
-            self(),
-            {:election, :check_election_status, term},
-            @check_election_timeout
-          )
-
-          {:ok, %{state | highest_seen_term: term}}
+          case compare_weight_in_cluster(state) do
+            {:ok, state} ->
+              PG.broadcast(fn pid ->
+                Squabble.announce_candidate(pid, term)
+              end)
+              Process.send_after(
+                self(),
+                {:election, :check_election_status, term},
+                @check_election_timeout
+              )
+              {:ok, %{state | highest_seen_term: term}}
+            _ ->
+              IO.inspect "low vote"
+              Process.send_after(
+                self(),
+                {:election, :check_election_status, term},
+                @check_election_timeout
+              )
+              {:ok, state}
+          end
         end
 
       {:error, :same} ->
@@ -135,7 +144,6 @@ defmodule Squabble.Server do
         end, type: :squabble)
 
         {:ok, state}
-
       _ ->
         {:ok, state}
     end
@@ -172,6 +180,26 @@ defmodule Squabble.Server do
         Logger.debug("Not enough votes to be a winner", type: :squabble)
 
         append_vote(state, pid)
+      {:error, :higher_weight_in_cluster} ->
+        Logger.debug("Has higher weighted node in cluster - ignoring", type: :squabble)
+
+        {:ok, state}
+    end
+  end
+
+  @doc """
+  """
+  def compare_weight_in_cluster(state) do
+    node_weights =
+      [others: true]
+      |> PG.execute(fn pid -> GenServer.call(pid, :weight) end)
+
+    IO.inspect "****************************"
+    IO.inspect [node_weights, state.weight], label: :debug
+
+    cond do
+      node_weights == [] or state.weight >= Enum.max(node_weights)  -> {:ok, state}
+      true -> {:error, :higher_weight_in_cluster}
     end
   end
 

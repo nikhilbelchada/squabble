@@ -31,6 +31,22 @@ defmodule Squabble.PG do
   end
 
   @doc """
+  Execute a message on the members
+  """
+  @spec execute(Keyword.t(), (pid() -> any())) :: :ok
+  def execute([others: true], fun) do
+    [others: true] |> members() |> Enum.map(fun)
+  end
+
+  @doc """
+  Execute a message on the members
+  """
+  @spec execute((pid() -> any())) :: :ok
+  def execute(fun) do
+    members() |> Enum.map(fun)
+  end
+
+  @doc """
   Get the group members
   """
   @spec members() :: [pid()]

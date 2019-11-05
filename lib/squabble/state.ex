@@ -12,7 +12,8 @@ defmodule Squabble.State do
     :leader_pid,
     :leader_node,
     :voted_for,
-    :votes
+    :votes,
+    :weight
   ]
 
   @doc """
